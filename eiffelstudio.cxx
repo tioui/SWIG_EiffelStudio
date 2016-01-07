@@ -67,7 +67,6 @@ Hash * create_type_map(){
 }
 
 void EIFFELSTUDIO::main(int argc, char *argv[]) {
-   printf("I'm the EiffelStudio module... Yo.\n");
    SWIG_library_directory("eiffelstudio");
    Preprocessor_define("EIFFELSTUDIO 1", 0);
    SWIG_config_file("eiffelstudio.swg");
@@ -161,19 +160,15 @@ Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	String *Ctypestr = NULL;
 	String *Etypestr = NULL;
 	String * tempstr;
+	SwigType *resolve_type = SwigType_typedef_resolve_all(a_type);
 	Hash *result = NewHash();
-	if(SwigType_ispointer(a_type)){
-	   	Ctypestr = NewString(SwigType_str(a_type, NULL));
-		Etypestr = NewString(Getattr(h_type_map,"*"));
-	} else if(SwigType_isarray(a_type)){
-	   	Ctypestr = NewStringf(SwigType_str(a_type, NULL));
-		Replace(Ctypestr, "[]", "*", DOH_REPLACE_ANY);
+	if(SwigType_ispointer(resolve_type) or SwigType_isarray(resolve_type)){
+	   	Ctypestr = NewString(SwigType_str(SwigType_ltype(a_type), NULL));
 		Etypestr = NewString(Getattr(h_type_map,"*"));
 	} else if(SwigType_issimple(a_type)) {
 		Ctypestr = NewString(SwigType_str(a_type, NULL));
 		if (Strcmp(Ctypestr, "void")) {
-			tempstr = Getattr(h_type_map,SwigType_str(
-						SwigType_typedef_resolve_all(a_type), NULL));
+			tempstr = Getattr(h_type_map,SwigType_str(resolve_type, NULL));
 			if (tempstr) {
 				Etypestr = NewString(tempstr);
 			} else {
@@ -296,6 +291,10 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 	String *header = Getattr(n,"feature:h_file");
 	String *prefix = Getattr(n,"feature:prefix");
 	String *sufix = Getattr(n,"feature:sufix");
+	String *numeric_type = Getattr(n,"feature:numeric_define_type");
+	if ((numeric_type) && (!Strcmp(SwigType_str(type, NULL), "int"))) {
+		type = numeric_type;
+	}
 	String   *Cheader;
 	Hash *l_types = get_type_value(type);
 	int result = SWIG_OK;
