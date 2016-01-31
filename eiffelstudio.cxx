@@ -1,6 +1,40 @@
+/**
+ * \file eiffelstudio.cxx
+ * \author  Louis Marchand <prog@tioui.com>
+ * \version 1.0
+ *
+ * \section LICENSE
+ *
+ * The MIT License (MIT)
+ * 
+ * Copyright (c) 2016 Louis Marchand
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ * \section DESCRIPTION
+ *
+ * The EIFFELSTUDIO class redefine SWIG Language functionnality for
+ * EiffelStudio Wrapper
+ */
+
 #include <iostream>
 #include "swigmod.h"
-
 
 class EIFFELSTUDIO : public Language {
 private:
@@ -38,6 +72,14 @@ swig_eiffelstudio(void) {
   return new EIFFELSTUDIO();
 }
 
+/**
+ * \brief Map C type to there associated Eiffel Type
+ *
+ * Map each C type to it's associated Eiffel type. Every C pointer are
+ * repersent byt the key '*' and are pat to the Eiffel type 'POINTER'
+ *
+ * \return Hash map where the Key is a C type and the value is the Eiffel type
+ */
 Hash * create_type_map(){
 	Hash * map = NewHash();
 	Setattr(map, "*", "POINTER");
@@ -64,6 +106,12 @@ Hash * create_type_map(){
 	return map;
 }
 
+/**
+ * The Main function. Launched by the program Main.
+ *
+ * \param argc The number of element of `argv'
+ * \param argv Every parameters used in the 'swig' command line
+ */
 void EIFFELSTUDIO::main(int argc, char *argv[]) {
    SWIG_library_directory("eiffelstudio");
    Preprocessor_define("EIFFELSTUDIO 1", 0);
@@ -71,65 +119,48 @@ void EIFFELSTUDIO::main(int argc, char *argv[]) {
    SWIG_typemap_lang("eiffelstudio");
 }
 
-
-void Eiffel_header(File * a_file, String * a_name) {
-   Printf(a_file, "note\n");
-   Printf(a_file, "\tdescription: \"Module {%s}\"\n", a_name);
-   Printf(a_file, "\tgenerator: \"SWIG EiffelStudio module\"\n");
-   Printf(a_file, "\tdate: \"$Date$\"\n");
-   Printf(a_file, "\trevision: \"$Revision$\"\n");
-   Printf(a_file, "\n\nclass\n\t%s\n", a_name);
-   Printf(a_file, "\n\nfeature -- C externals\n\n");
-}
-
-
-void Eiffel_footer(File * a_file) {
-   Printf(a_file, "end\n");
-}
-
-
-
+/**
+ * \brief Parsing the root of the syntax tree
+ *
+ * When the parser start, the top node (root of the parsing tree)
+ * is managed by this function.
+ *
+ * \param n The root of the SWIG parsing tree
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::top(Node *n) {
 
-   /* Get the module name */
    String *module = Swig_string_upper(Getattr(n,"name"));
-
-   /* Get the output file name */
-   String *outfile = Getattr(n,"outfile");
-
-   /* Initialize I/O (see next section) */
    String *filen = NewStringf("%s%s.e", SWIG_output_directory(), Swig_string_lower(module));
    f_module = NewFile(filen, "w", SWIG_output_files());
    if (!f_module) {
       FileErrorDisplay(Swig_string_lower(module));
       SWIG_exit(EXIT_FAILURE);
    }
-
-   f_not_used = NewString("");
-
+   f_not_used = NewString(""); // Usefull for storing the unused SWIG run-time
    h_type_map = create_type_map();
-
    Swig_register_filebyname("header", f_module);
    Swig_register_filebyname("wrapper", f_module);
    Swig_register_filebyname("runtime", f_not_used);
-
-   /* Output module initialization code */
-//   Swig_banner(f_begin);
-
-//   Eiffel_header(f_module, module);
-   
-   /* Emit code for children */
    Language::top(n);
-
-   /* Cleanup files */
    Delete(f_module);
    Delete(f_not_used);
-
    Delete(h_type_map);
-
    return SWIG_OK;
 }
 
+/**
+ * \brief Extract the C type and Eiffel Type from a Swig type
+ *
+ * The resulting Hash map contain two key. The first one is `Ctype' and
+ * the value is the C type associated with the SWIG type. The second is
+ * `Etype' and is the Eiffel Type associated with the SWIG type.
+ *
+ * \param a_type A SWIG type
+ *
+ * \return Hash map containing the C and Eiffel type
+ */
 Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	String *Ctypestr = NULL;
 	String *Etypestr = NULL;
@@ -165,6 +196,18 @@ Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	return result;
 }
 
+/**
+ * \brief Add the C and Eiffel return type to the methods values Hash map
+ *
+ * Get the C and Eiffel type from the SWIG type `a_type' and add two keys to
+ * the `a_methods_values' object. The first one is `Creturn' and
+ * the value is the C type associated with the SWIG type. The second is
+ * `Ereturn' and is the Eiffel Type associated with the SWIG type.
+ *
+ * \param a_methods_values The Hash that the return types have to be added
+ * \param a_type The SWIG type representing a C method return type
+ * \note This function has a side effect on the argument `a_methods_values'
+ */
 void EIFFELSTUDIO::add_return_type(Hash *a_methods_values, SwigType *a_type){
 	Hash * l_types = get_type_value(a_type);
 	String * tempstr;
@@ -184,6 +227,25 @@ void EIFFELSTUDIO::add_return_type(Hash *a_methods_values, SwigType *a_type){
 	Delete(l_types);
 }
 
+/**
+ * \brief Add the C and Eiffel arguments types to the arguments values string
+ *
+ * Get the C and Eiffel types from every arguments in `a_parms' and add
+ * two String to the Hash map `a_values'. The first string is the C
+ * arguments types string and is identified by the key 'Cparm'.
+ * The second string is the Eiffel arguments string and is identified by the
+ * key 'Eparm'.
+ *
+ * The 'Cparm' string have the form:
+ * (Ctype1, Ctype2, ...)
+ *
+ * The 'Eparm' string have the form:
+ * (a_name1:Etype1; a_name2:Etype2; ...)
+ *
+ * \param a_values The Hash that the Strings have to be added
+ * \param a_parms A list of every argument of the methods that is parsing.
+ * \note This function has a side effect on the argument `a_values'
+ */
 void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
 	SwigType *type;
 	Hash * l_types = NULL;
@@ -229,8 +291,17 @@ void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
 	}
 }
 
+/**
+ * \brief Manage a function tree node
+ *
+ * Generate a function Eiffel Wrapper from the function parsing
+ * node `n'.
+ *
+ * \param n The function parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::functionWrapper(Node *n) {
-  /* Get some useful attributes of this function */
 	String   *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	ParmList *parms  = Getattr(n,"parms");
@@ -259,6 +330,16 @@ int EIFFELSTUDIO::functionWrapper(Node *n) {
 	return SWIG_OK;
 }
 
+/**
+ * \brief Manage a constant tree node
+ *
+ * Generate a constant Eiffel Wrapper from the constant parsing
+ * node `n'.
+ *
+ * \param n The constant parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::constantWrapper(Node *n) {
 	String   *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
@@ -293,6 +374,17 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 	return result;
 }
 
+/**
+ * \brief Manage a structure member tree node
+ *
+ * Generate a structure member Eiffel Wrapper from the structure member
+ * parsing node `n'. The generated Wrapper will have a getter and a setter for
+ * the struct member.
+ *
+ * \param n The structure member parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::membervariableHandler(Node *n){
 	String *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
@@ -340,6 +432,18 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 	return result;
 }
 
+/**
+ * \brief Manage a structure construction tree node
+ *
+ * Generate a structure construction Eiffel Wrapper from the structure
+ * construction parsing node `n'. The generated Wrapper will have a
+ * constructor Eiffel routine (called new_...) and a sizeof routine
+ * called (..._size).
+ *
+ * \param n The structure construction parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::constructorHandler(Node *n) {
 	String *name   = Getattr(n,"sym:name");
 	String *header = Getattr(n,"feature:h_file");
@@ -369,6 +473,17 @@ int EIFFELSTUDIO::constructorHandler(Node *n) {
 	return SWIG_OK;
 }
 
+/**
+ * \brief Manage a structure destruction tree node
+ *
+ * Generate a structure destruction Eiffel Wrapper from the structure
+ * destruction parsing node `n'. The generated Wrapper will have a
+ * destruction Eiffel routine (called delete_...).
+ *
+ * \param n The structure destruction parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::destructorHandler(Node *n) {
 	String *name   = Getattr(n,"sym:name");
 	String *header = Getattr(n,"feature:h_file");
@@ -396,6 +511,17 @@ int EIFFELSTUDIO::destructorHandler(Node *n) {
 	return SWIG_OK;
 }
 
+/**
+ * \brief Manage a global variable tree node
+ *
+ * Generate a global variable Eiffel Wrapper from the global variable
+ * parsing node `n'. The generated Wrapper will have a setter and a getter
+ * for the global variable.
+ *
+ * \param n The global variable parsing node
+ *
+ * \return SWIG_OK if no error and SWIG_ERROR on error
+ */
 int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 	String *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
