@@ -244,13 +244,13 @@ int EIFFELSTUDIO::functionWrapper(Node *n) {
 	add_return_type(l_values, type);
 	add_arguments(l_values, parms);
 	if (header) {
-		Cheader = NewStringf(" | <%s>", header);
+		Cheader = NewStringf(" use %s", header);
 	} else {
 		Cheader = NewString("");
 	}
 	Printf(f_module, "\tfrozen %s%s%s%s%s\n", prefix, name, sufix, Getattr(l_values, "Eparm"), Getattr(l_values, "Ereturn"));
 	Printf(f_module, "\t\texternal\n");
-	Printf(f_module, "\t\t\t\"C%s%s%s\"\n", Getattr(l_values, "Cparm"), Getattr(l_values, "Creturn"), Cheader);
+	Printf(f_module, "\t\t\t\"C signature %s%s%s\"\n", Getattr(l_values, "Cparm"), Getattr(l_values, "Creturn"), Cheader);
 	Printf(f_module, "\t\talias\n");
 	Printf(f_module, "\t\t\t\"%s\"\n", name);
 	Printf(f_module, "\t\tend\n\n");
@@ -273,7 +273,7 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 	Hash *l_types = get_type_value(type);
 	int result = SWIG_OK;
 	if (header) {
-		Cheader = NewStringf(" <%s>", header);
+		Cheader = NewStringf(" %s", header);
 	} else {
 		Cheader = NewString("");
 	}
@@ -307,7 +307,7 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 	Hash *l_types = get_type_value(type);
 	int result = SWIG_OK;
 	if (header) {
-		Cheader = NewStringf(" <%s>", header);
+		Cheader = NewStringf(" %s", header);
 	} else {
 		Cheader = NewString("");
 	}
@@ -348,7 +348,7 @@ int EIFFELSTUDIO::constructorHandler(Node *n) {
 	String *mrename = Swig_name_construct(getNSpace(), name);
 	String *Cheader;
 	if (header) {
-		Cheader = NewStringf(" use <%s>", header);
+		Cheader = NewStringf(" use %s", header);
 	} else {
 		Cheader = NewString("");
 	}
@@ -382,15 +382,15 @@ int EIFFELSTUDIO::destructorHandler(Node *n) {
 	mrename = Swig_name_destroy(getNSpace(), cname);
 	String *Cheader;
 	if (header) {
-		Cheader = NewStringf(" use <%s>", header);
+		Cheader = NewStringf(" use %s", header);
 	} else {
 		Cheader = NewString("");
 	}
-	Printf(f_module, "\tfrozen %s%s%s(self:POINTER)\n", prefix, mrename, sufix, cname);
+	Printf(f_module, "\tfrozen %s%s%s(a_self:POINTER)\n", prefix, mrename, sufix, cname);
 	Printf(f_module, "\t\texternal\n");
 	Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
 	Printf(f_module, "\t\talias\n");
-	Printf(f_module, "\t\t\t\"free($self)\"\n");
+	Printf(f_module, "\t\t\t\"free($a_self)\"\n");
 	Printf(f_module, "\t\tend\n\n");
 	Delete(Cheader);
 	return SWIG_OK;
@@ -406,7 +406,7 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 	Hash *l_types = get_type_value(type);
 	int result = SWIG_OK;
 	if (header) {
-		Cheader = NewStringf(" use <%s>", header);
+		Cheader = NewStringf(" use %s", header);
 	} else {
 		Cheader = NewString("");
 	}
