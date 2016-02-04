@@ -43,39 +43,40 @@ private:
 	void add_arguments(ParmList *a_values, ParmList *a_parms);
 	Hash * get_type_value(SwigType *a_type);
 	bool managing_class;
+	String * externalType();
 
 protected:
-   File *f_module;
-   File *f_not_used;
-   Hash *h_type_map;
+	File *f_module;
+	File *f_not_used;
+	Hash *h_type_map;
 public:
 
-   virtual void main(int argc, char *argv[]);
+	virtual void main(int argc, char *argv[]);
 
-   virtual int top(Node *n);
+	virtual int top(Node *n);
 
-   virtual int functionWrapper(Node *n);
+	virtual int functionWrapper(Node *n);
 
-   virtual int memberfunctionHandler(Node *n);
+	virtual int memberfunctionHandler(Node *n);
 
-   virtual int constantWrapper(Node *n);
+	virtual int constantWrapper(Node *n);
 
-   virtual int membervariableHandler(Node *n);
+	virtual int membervariableHandler(Node *n);
    
-   virtual int structConstructorHandler(Node *n);
+	virtual int structConstructorHandler(Node *n);
 
-   virtual int classConstructorHandler(Node *n);
+	virtual int classConstructorHandler(Node *n);
 
-   virtual int constructorHandler(Node *n);
+	virtual int constructorHandler(Node *n);
    
-   virtual int destructorHandler(Node *n);
+	virtual int destructorHandler(Node *n);
 
-   virtual int globalvariableHandler(Node *n);
+	virtual int globalvariableHandler(Node *n);
 
-   virtual int classDeclaration(Node *n);
+	virtual int classDeclaration(Node *n);
 
+	virtual void manage_overloading(Node *n);
 };
-
 extern "C" Language *
 swig_eiffelstudio(void) {
   return new EIFFELSTUDIO();
@@ -122,10 +123,10 @@ Hash * create_type_map(){
  * \param argv Every parameters used in the 'swig' command line
  */
 void EIFFELSTUDIO::main(int argc, char *argv[]) {
-   SWIG_library_directory("eiffelstudio");
-   Preprocessor_define("EIFFELSTUDIO 1", 0);
-   SWIG_config_file("eiffelstudio.swg");
-   SWIG_typemap_lang("eiffelstudio");
+	SWIG_library_directory("eiffelstudio");
+	Preprocessor_define("EIFFELSTUDIO 1", 0);
+	SWIG_config_file("eiffelstudio.swg");
+	SWIG_typemap_lang("eiffelstudio");
 }
 
 /**
@@ -139,24 +140,26 @@ void EIFFELSTUDIO::main(int argc, char *argv[]) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::top(Node *n) {
-
-   String *module = Swig_string_upper(Getattr(n,"name"));
-   String *filen = NewStringf("%s%s.e", SWIG_output_directory(), Swig_string_lower(module));
-   f_module = NewFile(filen, "w", SWIG_output_files());
-   if (!f_module) {
-      FileErrorDisplay(Swig_string_lower(module));
-      SWIG_exit(EXIT_FAILURE);
-   }
-   f_not_used = NewString(""); // Usefull for storing the unused SWIG run-time
-   h_type_map = create_type_map();
-   Swig_register_filebyname("header", f_module);
-   Swig_register_filebyname("wrapper", f_module);
-   Swig_register_filebyname("runtime", f_not_used);
-   Language::top(n);
-   Delete(f_module);
-   Delete(f_not_used);
-   Delete(h_type_map);
-   return SWIG_OK;
+	manage_overloading(n);
+	String *module = Swig_string_lower(Getattr(n,"name"));
+	String *filen = NewStringf("%s%s.e", SWIG_output_directory(), module);
+	f_module = NewFile(filen, "w", SWIG_output_files());
+	if (!f_module) {
+		FileErrorDisplay(module);
+		SWIG_exit(EXIT_FAILURE);
+	}
+	f_not_used = NewString(""); // Usefull for storing the unused SWIG run-time
+	h_type_map = create_type_map();
+	Swig_register_filebyname("header", f_module);
+	Swig_register_filebyname("wrapper", f_module);
+ 	Swig_register_filebyname("runtime", f_not_used);
+	Language::top(n);
+	Delete(filen);
+	Delete(module);
+	Delete(f_module);
+	Delete(f_not_used);
+	Delete(h_type_map);
+	return SWIG_OK;
 }
 
 /**
@@ -168,12 +171,13 @@ int EIFFELSTUDIO::top(Node *n) {
  *
  * \param a_type A SWIG type
  *
- * \return Hash map containing the C and Eiffel type
+ * \return Hash map containing the C and Eiffel type (Callers must `Delete' it)
  */
 Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	String *Ctypestr = NULL;
 	String *Etypestr = NULL;
 	String * tempstr;
+   	String * tempstr2;
 	SwigType *resolve_type = SwigType_typedef_resolve_all(a_type);
 	Hash *result = NewHash();
 	if(SwigType_ispointer(resolve_type) or SwigType_isarray(resolve_type)){
@@ -182,7 +186,9 @@ Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	} else if(SwigType_issimple(a_type)) {
 		Ctypestr = NewString(SwigType_str(a_type, NULL));
 		if (Strcmp(Ctypestr, "void")) {
-			tempstr = Getattr(h_type_map,SwigType_str(resolve_type, NULL));
+			tempstr2 = SwigType_str(resolve_type, NULL);
+			tempstr = Getattr(h_type_map,tempstr2);
+			Delete(tempstr2);
 			if (tempstr) {
 				Etypestr = NewString(tempstr);
 			} else {
@@ -202,6 +208,7 @@ Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 		Delete(Ctypestr);
 		Delete(Etypestr);
 	}
+	Delete(resolve_type);
 	return result;
 }
 
@@ -259,7 +266,6 @@ void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
 	SwigType *type;
 	Hash * l_types = NULL;
 	String *name;
-	String *value;
 	String *eArguments = NULL;
 	String *eCparams = NULL;
 	String * tempstr;
@@ -270,14 +276,14 @@ void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
 		if(p){
 			type  = Getattr(p,"type");
 			name  = NewString(Getattr(p,"name"));
-			value = Getattr(p,"value");
 			if(Len(name) == 0){
+				Delete(name);
 				name = NewStringf("argument%d", i);
 			}
 			l_types = get_type_value(type);
 			if (!eArguments) {
 				eArguments = NewStringf("(a_%s: %s", name, Getattr(l_types, "Etype"));
-				eCparams = NewStringf("(%s", Getattr(l_types, "Ctype"));
+				eCparams = NewStringf(" (%s", Getattr(l_types, "Ctype"));
 			} else {
 				tempstr = NewStringf("; a_%s: %s", name, Getattr(l_types, "Etype"));
 				Append(eArguments, tempstr);
@@ -307,6 +313,46 @@ void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
 }
 
 /**
+ * \brief Return the string indicating the external type (C or C++)
+ *
+ * \return The String "C" if in C mode, "C++" if in C++ mode
+ */
+String * EIFFELSTUDIO::externalType(){
+	String * result = NULL;
+	if (CPlusPlus){
+		result = NewString("C++");
+	} else {
+		result = NewString("C");
+	}
+	return result;
+}
+
+void EIFFELSTUDIO::inlineWrapper(
+		Node *n, Hash * a_signature_values, String * a_alias) {
+	String *header = Getattr(n,"feature:h_file");
+	String *prefix = Getattr(n,"feature:prefix");
+	String *sufix = Getattr(n,"feature:sufix");
+	String *external_type = externalType();
+	String *Cheader;
+	if (header) {
+		Cheader = NewStringf(" use %s", header);
+	} else {
+		Cheader = NewString("");
+	}
+	Printf(f_module, "\tfrozen %s%s%s%s%s\n",
+			prefix, Getattr(a_signature_values, "name"), sufix,
+			Getattr(a_signature_values, "Eparm"), 
+			Getattr(a_signature_values, "Ereturn"));
+	Printf(f_module, "\t\texternal\n");
+	Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
+	Printf(f_module, "\t\talias\n");
+	Printf(f_module, "\t\t\t\"%s\"\n", a_alias);
+	Printf(f_module, "\t\tend\n");
+	Delete(external_type);
+	Delete(Cheader)
+}
+
+/**
  * \brief Manage a function tree node
  *
  * Generate a function Eiffel Wrapper from the function parsing
@@ -317,6 +363,7 @@ void EIFFELSTUDIO::add_arguments(ParmList *a_values, ParmList *a_parms) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::functionWrapper(Node *n) {
+	manage_overloading(n);
 	String   *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	ParmList *parms  = Getattr(n,"parms");
@@ -327,31 +374,30 @@ int EIFFELSTUDIO::functionWrapper(Node *n) {
 	String *class_prefix = getClassPrefix();
 	String *static_name = Getattr(n,"staticmemberfunctionHandler:sym:name");
 	Hash *l_values = NewHash();
-	   
+	String *external_type = externalType();   
 	String   *Cheader;
+	if (header) {
+		if(storage){
+			Cheader = NewStringf(" %s", header);
+		} else {
+			Cheader = NewStringf(" use %s", header);
+		}
+	} else {
+		Cheader = NewString("");
+	}
 	add_return_type(l_values, type);
 	add_arguments(l_values, parms);
 	Printf(f_module, "\tfrozen %s%s%s%s%s\n", prefix, name, sufix,
 			Getattr(l_values, "Eparm"), Getattr(l_values, "Ereturn"));
 	Printf(f_module, "\t\texternal\n");
 	if(storage){
-		if (header) {
-			Cheader = NewStringf(" %s", header);
-		} else {
-			Cheader = NewString("");
-		}
-		Printf(f_module, "\t\t\t\"C++ [static %s%s]%s%s\"\n", class_prefix,
-				Cheader, Getattr(l_values, "Cparm"),
+		Printf(f_module, "\t\t\t\"%s [static %s%s]%s%s\"\n", external_type, 
+				class_prefix, Cheader, Getattr(l_values, "Cparm"),
 				Getattr(l_values, "Creturn"));
 		Printf(f_module, "\t\talias\n");
 		Printf(f_module, "\t\t\t\"%s\"\n", static_name);
 	} else {
-		if (header) {
-			Cheader = NewStringf(" use %s", header);
-		} else {
-			Cheader = NewString("");
-		}
-		Printf(f_module, "\t\t\t\"C signature %s%s%s\"\n",
+		Printf(f_module, "\t\t\t\"%s signature %s%s%s\"\n",external_type,
 				Getattr(l_values, "Cparm"),	Getattr(l_values, "Creturn"),
 				Cheader);
 		Printf(f_module, "\t\talias\n");
@@ -359,6 +405,7 @@ int EIFFELSTUDIO::functionWrapper(Node *n) {
 	}
 	Printf(f_module, "\t\tend\n\n");
 	Delete(Cheader);
+	Delete(external_type);
 	Delete(l_values);
 	return SWIG_OK;
 }
@@ -374,6 +421,7 @@ int EIFFELSTUDIO::functionWrapper(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::memberfunctionHandler(Node *n) {
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	ParmList *parms  = Getattr(n,"parms");
@@ -383,6 +431,7 @@ int EIFFELSTUDIO::memberfunctionHandler(Node *n) {
 	String *sufix = Getattr(n,"feature:sufix");
 	String *fname = Swig_name_member(getNSpace(), class_prefix, name);
 	Hash *l_values = NewHash();
+	String *external_type = externalType();   
 	String *Cheader;
 	int replace_count = 0;
 	if (header) {
@@ -400,13 +449,15 @@ int EIFFELSTUDIO::memberfunctionHandler(Node *n) {
 	Printf(f_module, "\tfrozen %s%s%s%s%s\n", prefix, fname, sufix,
 			Getattr(l_values, "Eparm"), Getattr(l_values, "Ereturn"));
 	Printf(f_module, "\t\texternal\n");
-	Printf(f_module, "\t\t\t\"C++ [%s%s] %s %s\"\n", class_prefix, Cheader,
-			Getattr(l_values, "Cparm"), Getattr(l_values, "Creturn"));
+	Printf(f_module, "\t\t\t\"%s [%s%s] %s %s\"\n", external_type, class_prefix,
+			Cheader, Getattr(l_values, "Cparm"), Getattr(l_values, "Creturn"));
 	Printf(f_module, "\t\talias\n");
 	Printf(f_module, "\t\t\t\"%s\"\n", name);
 	Printf(f_module, "\t\tend\n\n");
 
 	Delete(Cheader);
+	Delete(external_type);
+	Delete(fname);
 	Delete(l_values);
 	return SWIG_OK;
 }
@@ -422,13 +473,16 @@ int EIFFELSTUDIO::memberfunctionHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::constantWrapper(Node *n) {
+	manage_overloading(n);
 	String   *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	String *header = Getattr(n,"feature:h_file");
 	String *prefix = Getattr(n,"feature:prefix");
 	String *sufix = Getattr(n,"feature:sufix");
 	String *numeric_type = Getattr(n,"feature:numeric_define_type");
-	if ((numeric_type) && (!Strcmp(SwigType_str(type, NULL), "int"))) {
+	String *stringType = SwigType_str(type, NULL);
+	String *external_type = externalType();   
+	if ((numeric_type) && (!Strcmp(stringType, "int"))) {
 		type = numeric_type;
 	}
 	String   *Cheader;
@@ -440,16 +494,20 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 		Cheader = NewString("");
 	}
 	if (Getattr(l_types, "Etype") && Getattr(l_types, "Ctype")) {
-		Printf(f_module, "\tfrozen %s%s%s : %s\n", prefix, name, sufix, Getattr(l_types, "Etype"));
+		Printf(f_module, "\tfrozen %s%s%s : %s\n", prefix, name, sufix,
+				Getattr(l_types, "Etype"));
 		Printf(f_module, "\t\texternal\n");
-		Printf(f_module, "\t\t\t\"C [macro%s] : %s\"\n", Cheader, Getattr(l_types, "Ctype"));
+		Printf(f_module, "\t\t\t\"%s [macro%s] : %s\"\n", external_type,
+				Cheader, Getattr(l_types, "Ctype"));
 		Printf(f_module, "\t\talias\n");
 		Printf(f_module, "\t\t\t\"%s\"\n", name);
 		Printf(f_module, "\t\tend\n\n");
 	} else {
-		Printf(stdout, "Cannot get Eiffel Type from C type %s.", SwigType_str(type, NULL));
+		Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
 		result = SWIG_ERROR;
 	}
+	Delete(stringType);
+	Delete(external_type);
 	Delete(Cheader);
 	Delete(l_types);
 	return result;
@@ -467,6 +525,7 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::membervariableHandler(Node *n){
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	String *class_prefix = getClassPrefix();
@@ -477,7 +536,9 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 	String *mrename_set;
 	String *mname;
 	String *Cheader;
+	String *stringType = SwigType_str(type, NULL);
 	Hash *l_types = get_type_value(type);
+	String *external_type = externalType();   
 	int result = SWIG_OK;
 	if (header) {
 		Cheader = NewStringf(" %s", header);
@@ -490,10 +551,12 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 		Printf(f_module, "\tfrozen %s%s%s(a_pointer:POINTER) : %s\n", prefix, mrename_get, sufix, Getattr(l_types, "Etype"));
 		Printf(f_module, "\t\texternal\n");
 		if(managing_class){
-			Printf(f_module, "\t\t\t\"C++ [data_member %s%s] : %s\"\n", class_prefix,
-					Cheader, Getattr(l_types, "Ctype"));
+			Printf(f_module, "\t\t\t\"%s [data_member %s%s] : %s\"\n", external_type, 
+					class_prefix, Cheader, Getattr(l_types, "Ctype"));
 		} else {
-			Printf(f_module, "\t\t\t\"C [struct%s] (%s) : %s\"\n", Cheader, class_prefix, Getattr(l_types, "Ctype"));
+			Printf(f_module, "\t\t\t\"%s [struct%s] (%s) : %s\"\n", 
+					external_type, Cheader, class_prefix,
+					Getattr(l_types, "Ctype"));
 		}
 		Printf(f_module, "\t\talias\n");
 		Printf(f_module, "\t\t\t\"%s\"\n", name);
@@ -501,9 +564,11 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 		Delete(mrename_get);
 		if (is_assignable(n) && !managing_class) {
 			mrename_set = Swig_name_set(getNSpace(), mname);
-			Printf(f_module, "\tfrozen %s%s%s(a_pointer:POINTER; a_%s:%s)\n", prefix, mrename_set, sufix, name, Getattr(l_types, "Etype"));
+			Printf(f_module, "\tfrozen %s%s%s(a_pointer:POINTER; a_%s:%s)\n",
+					prefix, mrename_set, sufix, name, Getattr(l_types, "Etype"));
 			Printf(f_module, "\t\texternal\n");
-			Printf(f_module, "\t\t\t\"C [struct%s] (%s, %s)\"\n", Cheader, class_prefix, Getattr(l_types, "Ctype"));
+			Printf(f_module, "\t\t\t\"%s [struct%s] (%s, %s)\"\n", external_type, 
+					Cheader, class_prefix, Getattr(l_types, "Ctype"));
 			Printf(f_module, "\t\talias\n");
 			Printf(f_module, "\t\t\t\"%s\"\n", name);
 			Printf(f_module, "\t\tend\n\n");
@@ -511,10 +576,13 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 		}
 		Delete(mname);
 	} else {
-		Printf(stdout, "Cannot get Eiffel Type from C type %s.", SwigType_str(type, NULL));
+		Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
 		result = SWIG_ERROR;
 	}
+	Delete(stringType);
+	Delete(external_type);
 	Delete(Cheader);
+	Delete(l_types);
 	return result;
 }
 
@@ -531,11 +599,13 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::structConstructorHandler(Node *n) {
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	String *header = Getattr(n,"feature:h_file");
 	String *prefix = Getattr(n,"feature:prefix");
 	String *sufix = Getattr(n,"feature:sufix");
 	String *mrename = Swig_name_construct(getNSpace(), name);
+	String *external_type = externalType();   
 	String *Cheader;
 	if (header) {
 		Cheader = NewStringf(" use %s", header);
@@ -544,18 +614,19 @@ int EIFFELSTUDIO::structConstructorHandler(Node *n) {
 	}
 	Printf(f_module, "\tfrozen %s%s_size%s:INTEGER\n", prefix, name, sufix);
 	Printf(f_module, "\t\texternal\n");
-	Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
+	Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
 	Printf(f_module, "\t\talias\n");
 	Printf(f_module, "\t\t\t\"sizeof(%s)\"\n", name);
 	Printf(f_module, "\t\tend\n\n");
 	Printf(f_module, "\tfrozen %s%s%s:POINTER\n", prefix, mrename, sufix);
 	Printf(f_module, "\t\texternal\n");
-	Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
+	Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
 	Printf(f_module, "\t\talias\n");
 	Printf(f_module, "\t\t\t\"malloc(sizeof(%s))\"\n", name);
 	Printf(f_module, "\t\tend\n\n");
 	Delete(Cheader);
-
+	Delete(external_type);
+	Delete(mrename);
 	return SWIG_OK;
 }
 
@@ -570,6 +641,7 @@ int EIFFELSTUDIO::structConstructorHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::classConstructorHandler(Node *n) {
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	ParmList *parms  = Getattr(n,"parms");
 	String *header = Getattr(n,"feature:h_file");
@@ -578,6 +650,7 @@ int EIFFELSTUDIO::classConstructorHandler(Node *n) {
 	Hash *l_values = NewHash();
 	add_arguments(l_values, parms);
 	String *mrename = Swig_name_construct(getNSpace(), name);
+	String *external_type = externalType();   
 	String *Cheader;
 	if (header) {
 		Cheader = NewStringf(" %s", header);
@@ -587,11 +660,12 @@ int EIFFELSTUDIO::classConstructorHandler(Node *n) {
 	Printf(f_module, "\tfrozen %s%s%s%s:POINTER\n", prefix, mrename, sufix, 
 			Getattr(l_values, "Eparm"));
 	Printf(f_module, "\t\texternal\n");
-	Printf(f_module, "\t\t\t\"C++ [new %s%s]%s\"\n", name, Cheader,
-			Getattr(l_values, "Cparm"));
+	Printf(f_module, "\t\t\t\"%s [new %s%s]%s\"\n", external_type, name,
+			Cheader, Getattr(l_values, "Cparm"));
 	Printf(f_module, "\t\tend\n\n");
 	Delete(Cheader);
-
+	Delete(external_type);
+	Delete(mrename);
 	return SWIG_OK;
 }
 
@@ -606,7 +680,9 @@ int EIFFELSTUDIO::classConstructorHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::constructorHandler(Node *n) {
-	int result;
+	Swig_print_node(n);
+	int result = SWIG_OK;
+	manage_overloading(n);
 	if(managing_class){
 		result = classConstructorHandler(n);
 	} else {
@@ -627,10 +703,12 @@ int EIFFELSTUDIO::constructorHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::destructorHandler(Node *n) {
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	String *header = Getattr(n,"feature:h_file");
 	String *prefix = Getattr(n,"feature:prefix");
 	String *sufix = Getattr(n,"feature:sufix");
+	String *external_type = externalType();   
 	String *mrename;
 	char *cname = Char(name);
 	if (*cname == '~') {
@@ -650,17 +728,19 @@ int EIFFELSTUDIO::destructorHandler(Node *n) {
 	if(managing_class){
 		Printf(f_module, "\tfrozen %s%s%s(a_self:POINTER)\n", prefix, mrename, sufix);
 		Printf(f_module, "\t\texternal\n");
-		Printf(f_module, "\t\t\t\"C++ [delete %s%s]\"\n", cname, Cheader);
+		Printf(f_module, "\t\t\t\"%s [delete %s%s]\"\n", external_type, cname, Cheader);
 		Printf(f_module, "\t\tend\n\n");
 	} else {
 		Printf(f_module, "\tfrozen %s%s%s(a_self:POINTER)\n", prefix, mrename, sufix);
 		Printf(f_module, "\t\texternal\n");
-		Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
+		Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
 		Printf(f_module, "\t\talias\n");
 		Printf(f_module, "\t\t\t\"free($a_self)\"\n");
 		Printf(f_module, "\t\tend\n\n");
 	}
 	Delete(Cheader);
+	Delete(external_type);
+	Delete(mrename);
 	return SWIG_OK;
 }
 
@@ -676,6 +756,7 @@ int EIFFELSTUDIO::destructorHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::globalvariableHandler(Node *n) {
+	manage_overloading(n);
 	String *name   = Getattr(n,"sym:name");
 	SwigType *type   = Getattr(n,"type");
 	String *header = Getattr(n,"feature:h_file");
@@ -683,6 +764,8 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 	String *sufix = Getattr(n,"feature:sufix");
 	String *Cheader;
 	Hash *l_types = get_type_value(type);
+	String *external_type = externalType();   
+	String * stringType = SwigType_str(type, NULL);
 	int result = SWIG_OK;
 	if (header) {
 		Cheader = NewStringf(" use %s", header);
@@ -692,21 +775,26 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 	if (Getattr(l_types, "Etype")) {
 		Printf(f_module, "\tfrozen %s%s_get%s : %s\n", prefix, name, sufix, Getattr(l_types, "Etype"));
 		Printf(f_module, "\t\texternal\n");
-		Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
+		Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
 		Printf(f_module, "\t\talias\n");
 		Printf(f_module, "\t\t\t\"%s\"\n", name);
 		Printf(f_module, "\t\tend\n\n");
-		Printf(f_module, "\tfrozen %s%s_set%s(a_value : %s)\n", prefix, name, sufix, Getattr(l_types, "Etype"));
-		Printf(f_module, "\t\texternal\n");
-		Printf(f_module, "\t\t\t\"C inline%s\"\n", Cheader);
-		Printf(f_module, "\t\talias\n");
-		Printf(f_module, "\t\t\t\"%s = $a_value\"\n", name);
-		Printf(f_module, "\t\tend\n\n");
+		if (is_assignable(n)){
+			Printf(f_module, "\tfrozen %s%s_set%s(a_value : %s)\n", prefix, name, sufix, Getattr(l_types, "Etype"));
+			Printf(f_module, "\t\texternal\n");
+			Printf(f_module, "\t\t\t\"%s inline%s\"\n", external_type, Cheader);
+			Printf(f_module, "\t\talias\n");
+			Printf(f_module, "\t\t\t\"%s = $a_value\"\n", name);
+			Printf(f_module, "\t\tend\n\n");
+		}
 	} else {
-		Printf(stdout, "Cannot get Eiffel Type from C type %s.", SwigType_str(type, NULL));
+		Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
 		result = SWIG_ERROR;
 	}
+	Delete(stringType);
 	Delete(Cheader);
+	Delete(external_type);
+	Delete(l_types);
 	return result;
 }
 
@@ -722,10 +810,20 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
  * \return SWIG_OK if no error and SWIG_ERROR on error
  */
 int EIFFELSTUDIO::classDeclaration(Node *n) {
+	manage_overloading(n);
 	int result;
 	String *kind = Getattr(n, "kind");
 	managing_class = (Strcmp(kind, "class") == 0);
 	result = Language::classDeclaration(n);
 	managing_class = false;
 	return result;
+}
+
+/**
+ * \brief Manage the allow_overloading feature flag
+ *
+ * \param n The current parsing node
+ */
+void EIFFELSTUDIO::manage_overloading(Node *n) {
+	allow_overloading(GetFlag(n,"feature:allow_overloading"));
 }
