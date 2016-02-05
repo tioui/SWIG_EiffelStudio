@@ -457,6 +457,7 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 	String *stringType = SwigType_str(type, NULL);
 	String *external_type = externalType();   
 	String *l_alias;
+	String *tempstr;
 	Hash *l_values = get_type_value(type);
 	if ((numeric_type) && (!Strcmp(stringType, "int"))) {
 		type = numeric_type;
@@ -464,6 +465,9 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 	int result = SWIG_OK;
 	if (Getattr(l_values, "Etype")) {
 		Setattr(l_values, "name", name);
+		tempstr = NewStringf(": %s", Getattr(l_values, "Etype"));
+		Setattr(l_values, "Ereturn", tempstr);
+		Delete(tempstr);
 		l_alias = NewStringf("return %s", name);
 		inlineWrapper(n, l_values, l_alias);
 	}  else {
