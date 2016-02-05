@@ -1,13 +1,13 @@
-%module test_external
+%module test_external_c
 %{
 note
-    description: "Test class for Eiffel SWIG plug-in"
+    description: "Test class for Eiffel SWIG plug-in(C only)"
     author: "Louis Marchand"
     date: "Thu, 02 Apr 2015 02:40:10 +0000"
     revision: "2.0"
 
 class
-    TEST_EXTERNAL
+    TEST_EXTERNAL_C
 
 feature -- C external
 
