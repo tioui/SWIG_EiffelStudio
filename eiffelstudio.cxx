@@ -509,21 +509,22 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 			mrename_set = Swig_name_set(getNSpace(), mname);
 	int result = SWIG_OK;
 	if (Getattr(l_types, "Etype")) {
-		l_alias = NewStringf("return ((%s *)a_self)->%s", class_cast, name);
+		l_alias = NewStringf("return ((%s *)$a_self)->%s", class_cast, name);
 		Setattr(l_values, "name", mrename_get);
 		tempstr = NewStringf(": %s", Getattr(l_types, "Etype"));
 		Setattr(l_values, "Ereturn", tempstr);
 		Delete(tempstr);
+		Setattr(l_values, "Eparm", "(a_self:POINTER)");
 		inlineWrapper(n, l_values, l_alias);	
 		if (is_assignable(n)) {
 			Delete(l_alias);
-			l_alias = NewStringf("((%s *)a_self)->%s = (%s)$a_value", class_cast,
+			l_alias = NewStringf("((%s *)$a_self)->%s = (%s)$a_value", class_cast,
 					name, Getattr(l_types, "Ctype"));
 			Setattr(l_values, "name", mrename_set);
 			tempstr = NewStringf("(a_self:POINTER; a_value:%s)", Getattr(l_types, "Etype"));
 			Setattr(l_values, "Eparm", tempstr);
-			Setattr(l_values, "Ereturn", NULL);
 			Delete(tempstr);
+			Setattr(l_values, "Ereturn", NULL);
 			inlineWrapper(n, l_values, l_alias);	
 		}
 	} else {
@@ -680,7 +681,9 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 	String * stringType = SwigType_str(type, NULL);
 	int result = SWIG_OK;
 	if (Getattr(l_types, "Etype")) {
-		Setattr(l_values, "Ereturn", Getattr(l_types, "Etype"));
+		tempstr = NewStringf(": %s", Getattr(l_types, "Etype"));
+		Setattr(l_values, "Ereturn", tempstr);
+		Delete(tempstr);
 		tempstr = NewStringf("%s_get", name);
 		Setattr(l_values, "name", tempstr);
 		Delete(tempstr);
