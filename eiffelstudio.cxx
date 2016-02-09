@@ -182,25 +182,30 @@ Hash *EIFFELSTUDIO::get_type_value(SwigType *a_type){
 	String * tempstr;
    	String * tempstr2;
 	SwigType *resolve_type = SwigType_typedef_resolve_all(a_type);
+	SwigType *base_type;
 	Hash *result = NewHash();
 	if(SwigType_ispointer(resolve_type) or SwigType_isarray(resolve_type)){
 	   	Ctypestr = NewString(SwigType_str(SwigType_ltype(a_type), NULL));
 		Etypestr = NewString(Getattr(h_type_map,"*"));
-	} else if(SwigType_issimple(a_type)) {
-		Ctypestr = NewString(SwigType_str(a_type, NULL));
-		if (Strcmp(Ctypestr, "void")) {
-			tempstr2 = SwigType_str(resolve_type, NULL);
-			tempstr = Getattr(h_type_map,tempstr2);
-			Delete(tempstr2);
-			if (tempstr) {
-				Etypestr = NewString(tempstr);
+	} else {
+		base_type = SwigType_base(resolve_type);
+		if(SwigType_issimple(base_type)) {
+			Ctypestr = NewString(SwigType_str(a_type, NULL));
+			if (Strcmp(Ctypestr, "void")) {
+				tempstr2 = SwigType_str(base_type, NULL);
+				tempstr = Getattr(h_type_map,tempstr2);
+				Delete(tempstr2);
+				if (tempstr) {
+					Etypestr = NewString(tempstr);
+				} else {
+					Etypestr = NewString("UNKNOWN");
+				}
 			} else {
-				Etypestr = NewString("UNKNOWN");
+				Delete(Ctypestr);
+				Ctypestr = NULL;
 			}
-		} else {
-			Delete(Ctypestr);
-			Ctypestr = NULL;
 		}
+		Delete(base_type);
 	}
 	if(Ctypestr and Etypestr){
 		Replace(Ctypestr, " const", "", DOH_REPLACE_ANY);
@@ -471,7 +476,7 @@ int EIFFELSTUDIO::constantWrapper(Node *n) {
 		l_alias = NewStringf("return %s", name);
 		inlineWrapper(n, l_values, l_alias);
 	}  else {
-        Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
+        Printf(stdout, "ConstantWrapper: Cannot get Eiffel Type from C type %s.\n", stringType);
         result = SWIG_ERROR;
     }
 	Delete(stringType);
@@ -506,7 +511,7 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 	Hash * l_values = NewHash();
 	mname = Swig_name_member(0, class_prefix, name);
 	mrename_get = Swig_name_get(getNSpace(), mname);
-			mrename_set = Swig_name_set(getNSpace(), mname);
+	mrename_set = Swig_name_set(getNSpace(), mname);
 	int result = SWIG_OK;
 	if (Getattr(l_types, "Etype")) {
 		l_alias = NewStringf("return ((%s *)$a_self)->%s", class_cast, name);
@@ -516,8 +521,8 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 		Delete(tempstr);
 		Setattr(l_values, "Eparm", "(a_self:POINTER)");
 		inlineWrapper(n, l_values, l_alias);	
+		Delete(l_alias);
 		if (is_assignable(n)) {
-			Delete(l_alias);
 			l_alias = NewStringf("((%s *)$a_self)->%s = (%s)$a_value", class_cast,
 					name, Getattr(l_types, "Ctype"));
 			Setattr(l_values, "name", mrename_set);
@@ -526,12 +531,12 @@ int EIFFELSTUDIO::membervariableHandler(Node *n){
 			Delete(tempstr);
 			Setattr(l_values, "Ereturn", NULL);
 			inlineWrapper(n, l_values, l_alias);	
+			Delete(l_alias);
 		}
 	} else {
-		Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
+		Printf(stdout, "MemberVariableHandler: Cannot get Eiffel Type from C type %s.\n", stringType);
 		result = SWIG_ERROR;
 	}
-	Delete(l_alias);
 	Delete(stringType);
 	Delete(mname);
 	Delete(mrename_get);
@@ -689,8 +694,8 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 		Delete(tempstr);
 		l_alias = NewStringf("return %s", name);
 		inlineWrapper(n, l_values, l_alias);
+		Delete(l_alias);
 		if (is_assignable(n)){
-			Delete(l_alias);
 			Setattr(l_values, "Ereturn", NULL);
 			tempstr = NewStringf("(a_value : %s)", Getattr(l_types, "Etype"));
 			Setattr(l_values, "Eparm", tempstr);
@@ -700,13 +705,13 @@ int EIFFELSTUDIO::globalvariableHandler(Node *n) {
 			Delete(tempstr);
 			l_alias = NewStringf("%s = $a_value", name);
 			inlineWrapper(n, l_values, l_alias);
+			Delete(l_alias);
 		}
 	} else {
-		Printf(stdout, "Cannot get Eiffel Type from C type %s.", stringType);
+		Printf(stdout, "GlobalVariableHandler: Cannot get Eiffel Type from C type %s.\n", stringType);
 		result = SWIG_ERROR;
 	}
 	Delete(stringType);
-	Delete(l_alias);
 	Delete(l_values);
 	Delete(l_types);
 	return result;
