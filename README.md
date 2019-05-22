@@ -19,7 +19,7 @@ git clone https://github.com/swig/swig.git
 ln -s `pwd`/eiffelstudio.cxx swig/Source/Modules/eiffelstudio.cxx
 ```
 
-* Creating an unused precompilation file `eiffelstudio.swg` in `swig/Lib":
+* Creating an unused precompilation file `eiffelstudio.swg` in `swig/Lib`:
 ```
 touch swig/Lib/eiffelstudio.swg
 ```
